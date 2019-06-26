@@ -1,2 +1,7 @@
+![](image/usd.jpg)
+
 # USD
-Estimate Future Value of Currency Exchange Rate
+Estimating Future Value of Currency Exchange Rate with Machine Learning
+
+
+
