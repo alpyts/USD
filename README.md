@@ -21,5 +21,7 @@ ARIMA models can be estimated following the Box-Jenkins approach.
 https://facebook.github.io/prophet/
 
 
+***
 
-For More Detail: github.com/alpyts
+
+For More Detail: www.github.com/alpyts
