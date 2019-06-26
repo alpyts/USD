@@ -1,0 +1,283 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+### Time Series\
+
+**Autoregressive Integrated Moving Average**\
+
+
+
+In statistics and econometric, and in particular in time series analysis, an auto regressive integrated moving average (ARIMA) model is a generalization of an auto regressive moving average (ARMA) model. Both of these models are fitted to time series data either to better understand the data or to predict future points in the series (forecasting). ARIMA models are applied in some cases where **data show evidence of non-stationarity**, where an **initial differencing step** (corresponding to the "integrated" part of the model) can be applied one or more times to eliminate the non-stationary.\
+
+The AR part of ARIMA indicates that the evolving variable of interest is **regressed on its own lagged** (i.e., prior) values. The MA part indicates that the **regression error** is actually a linear combination of *error terms* whose values occurred contemporaneously and at various times in the past. The I (for "integrated") indicates that the data values have been replaced with the difference between their values and the previous values (and this difference process may have been performed more than once). The purpose of each of these features is to make the model fit the data as well as possible.\
+
+Non-seasonal ARIMA models are generally denoted ARIMA(p,d,q) where parameters p, d, and q are non-negative integers, p is the order (number of time lags) of the auto regressive model, d is the degree of difference (the number of times the data have had past values subtracted), and q is the order of the moving-average model. Seasonal ARIMA models are usually denoted ARIMA(p,d,q)(P,D,Q)m, where m refers to the number of periods in each season, and the uppercase P,D,Q refer to the auto regressive, difference, and moving average terms for the seasonal part of the ARIMA model.\
+
+*When two out of the three terms are zeros, the model may be referred to based on the non-zero parameter, dropping "AR", "I" or "MA" from the acronym describing the model. For example, ARIMA (1,0,0) is AR(1), ARIMA(0,1,0) is I(1), and ARIMA(0,0,1) is MA(1).*\
+
+ARIMA models can be estimated following the Box-Jenkins approach.\
+
+
+
+**This analysis help us to understand the housing price changes will be in 6 months**\
+
+
+
+ 
+
+#### Set The Libraries\
+
+Setting the libraries which will using on analyze.\
+
+```{r Libraries }
+library(ggplot2)
+library(forecast)
+library(tseries)
+library(astsa)
+library(readr)
+```
+
+
+#### Data Import\
+
+The data include monthly changes of unit housing prices at Istanbul\
+
+```{r Data Import }
+library(readr)
+USD <- read_csv("data.csv", col_types = cols(DATE = col_date(format = "%Y-%m-%d")))
+head(USD)
+```
+
+
+#### Show The Distribution of USD Price \ 
+
+Distribution of Daily USD Price :\
+
+```{r Distribution of USD Price}
+ggplot(USD, aes(date, monthly_average)) + 
+    geom_line() + scale_x_date('Years')  + 
+    ylab("USD Currency Rates") +
+            xlab("")
+```
+
+
+#### Clean The Outliers with Tsclean\
+
+Cleaning the trend of changes to get linear, handle with extreme outliers.
+
+```{r Clean The Outliers }
+count_ts = ts(USD[, c('monthly_average')])
+USD$clean_cnt = tsclean(count_ts)
+ggplot() +
+  geom_line(data = USD, aes(x = date, y = clean_cnt)) + 
+    ylab('Cleaned USD Currency Rates')
+```
+
+
+#### Quarterly and Monthly Moving Averages\
+
+Divide into data some different periods to forecast more accuracy.\
+
+```{r Moving Averages }
+
+
+USD$cnt_ma3   = ma(USD$clean_cnt, order=3)
+USD$cnt_ma7   = ma(USD$clean_cnt, order=7)
+USD$cnt_ma30  = ma(USD$clean_cnt, order=30)
+USD$cnt_ma90  = ma(USD$clean_cnt, order=90)
+USD$cnt_ma365 = ma(USD$clean_cnt, order=365)
+
+
+ggplot() +
+  geom_line(data = USD, aes(x = date, 
+                                         y = cnt_ma3, 
+                                         colour = "3 Daily Average")) +
+  geom_line(data = USD, aes(x = date, 
+                                         y = cnt_ma7,   
+                                         colour = "Weekly Moving Average"))  +
+  geom_line(data = USD, aes(x = date, 
+                                         y = cnt_ma30,   
+                                         colour = "Monthly Moving Average"))  +
+  geom_line(data = USD, aes(x = date, 
+                                         y = cnt_ma90,   
+                                         colour = "Quarterly Moving Average"))  +
+  geom_line(data = USD, aes(x = date, 
+                                         y = cnt_ma365,   
+                                         colour = "Yearly Moving Average"))  +
+    
+  ylab('USD Currency Changes')
+  
+
+```
+
+#### Decompose - Forecasting The Data\
+
+Decomposing data to get rid of seasonality. Chooses the frequency two.
+This means Auto Regressive Term and Moving Avarages according to two months. 
+
+```{r Decompose }
+count_ma = ts(na.omit(USD$cnt_ma3), 
+              frequency=3)
+decomp = stl(count_ma, 
+             s.window = "periodic")
+deseasonal_cnt <- seasadj(decomp)
+plot(decomp)
+```
+
+* Data : The trend isn't in balance and very variable term.
+* Seasonality: Not in seasonality
+* Trend: Changes are going down for the last 5-6 periods.
+* Remainder: Show us the lag of data. In the 16th period.\
+
+#### Stationarity - ADF Test\
+
+```{r ADF Test }
+adf.test(count_ma, 
+         alternative = "stationary")
+```
+
+Now, testing model with ADF - Augmented Dickey Fuller Test, p-value bigger than .05\
+
+
+#### Autocorrelation and Choosing Model Order (ACF)\
+
+Auto correlation, also known as **serial correlation**, is the correlation of a signal with a delayed copy of itself as a function of delay. Informally, it is the similarity between observations as a function of the **time lag** between them. The analysis of auto correlation is a mathematical tool for finding repeating patterns, such as the presence of a periodic signal obscured by noise, or identifying the missing fundamental frequency in a signal implied by its harmonic frequencies. It is often used in signal processing for analyzing functions or series of values, such as time domain signals.
+
+*Different fields of study define autocorrelation differently, and not all of these definitions are equivalent. In some fields, the term is used interchangeably with autocovariance.*
+
+Unit root processes, trend stationary processes, auto regressive processes, and moving average processes are specific forms of processes with auto correlation.\
+
+
+```{r ACF-PACF }
+##autocorrelation 
+Acf(count_ma, main ="", plot = TRUE)
+Pacf(count_ma, main ="",  plot = TRUE)
+#Acf(count_ma, main ="", plot = FALSE)
+#Pacf(count_ma, main ="",  plot = FALSE)
+```
+
+There are no stationary in the model, Lags are keeping decrease untill 18th periods.\
+
+
+#### Tune The Model\
+
+```{r Model Tunning }
+count_d1 = diff(deseasonal_cnt, differences = 2)
+plot(count_d1)
+adf.test(count_d1, alternative = "stationary" )
+```
+
+If the p value was bigger than 0.05, Differences should be use again. The model's p-value ~ .01\
+
+This process using errors to forecast previous periods.
+
+
+```{r }
+## count_d2 = diff(count_d1, differences = 1)
+## plot(count_d2)
+## adf.test(count_d2, alternative = "stationary" )
+```
+
+
+```{r ACF-PACF2 }
+Acf(count_d1, 
+    main = "ACF for Differenced Series")
+Pacf(count_d1, 
+     main = "PACF for Differenced Series")
+#Acf(count_d1, 
+#    main = "ACF for Differenced Series", plot = FALSE)
+#Pacf(count_d1, 
+#     main = "PACF for Differenced Series", plot = FALSE)
+```
+
+Lags can be observed in 3rd months because of the model array order is 3. To justify the model lag max should be 3. At 9th month's lag isn't in trust line. Fitting and Autoarima should be try.\
+
+
+ 
+
+#### Fitting an ARIMA Model\
+
+```{r Fitting AutoArima }
+auto.arima(deseasonal_cnt, seasonal = FALSE)
+```
+
+**Auto arima say to model use Auto Regressive Term and Moving Average Two, Difference period is one.**\
+
+ 
+#### Evaluate and Iterate\
+
+```{r Evaluate-Iterate }
+fit1 <- auto.arima(deseasonal_cnt, 
+                   seasonal = FALSE)
+tsdisplay(residuals(fit1), lag.max = 24, 
+          main = "(0,2,2) Model Residuals")
+```
+
+
+```{r }
+#fit2 = arima(deseasonal_cnt, order = c(1,1,1))
+#fit2
+#tsdisplay(residuals(fit2), lag.max = 12, main ="Seasonal Model Residuals")
+```
+
+```{r Forecast Plot }
+fcast <- forecast(fit1, h = 30)
+plot(fcast)
+```
+
+```{r Deseasonal  }
+hold <- window(ts(deseasonal_cnt), start = 900)
+fit_no_holdout = arima(ts(deseasonal_cnt[-c(1000:1200)]), 
+                       order = c(0,2,2))
+fcast_no_holdout <- forecast(fit_no_holdout, h = 7)
+plot(fcast_no_holdout, main = "")
+lines(ts(deseasonal_cnt))
+```
+
+```{r Seasonality }
+fit_w_seasonality = auto.arima(deseasonal_cnt, seasonal=TRUE)
+fit_w_seasonality
+```
+
+
+```{r}
+hold <- window(ts(deseasonal_cnt), start = 1000)
+fit_no_holdout = arima(ts(deseasonal_cnt[-c(1100:1200)]), 
+                       order = c(2,2,1))
+fcast_no_holdout <- forecast(fit_no_holdout, h = 30)
+plot(fcast_no_holdout, main = "")
+lines(ts(deseasonal_cnt))
+```
+
+
+#### Forecast The USD Currency\
+
+
+ 
+```{r}
+USD$date <- as.POSIXct(USD$date, origin = '2005-05-26')
+```
+
+
+
+
+ 
+
+```{r Forecast }
+seas_fcast <- forecast(fit_w_seasonality, h=30)
+plot(seas_fcast)
+summary(seas_fcast)
+
+head(seas_fcast)
+```
+
+
+\
+
+
+***
+
+
+\
