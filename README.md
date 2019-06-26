@@ -1,5 +1,5 @@
 
-![](alpyts/alpyts.github.io/images/usd.jpg)
+![](usd.jpg)
 
 # USD
 Estimating Future Value of Currency Exchange Rate with Machine Learning
